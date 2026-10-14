@@ -1,0 +1,2 @@
+{{#isFormParam}}
+{{#isDeprecated}}@Deprecated {{/isDeprecated}}{{^isFile}}@FormParam(value = "{{baseName}}")  {{#useJspecify}}{{>nullable_var_annotations}}{{/useJspecify}}{{>nullableDataType}} {{paramName}}{{/isFile}}{{#isFile}}@FormParam(value = "{{baseName}}") InputStream {{paramName}}InputStream{{/isFile}}{{/isFormParam}}
