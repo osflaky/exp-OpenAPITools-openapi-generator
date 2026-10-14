@@ -1,0 +1,58 @@
+name: Gradle tests (Java samples)
+
+on:
+  workflow_dispatch:
+env:
+  GRADLE_VERSION: 8.7
+
+jobs:
+  build:
+    name: Gradle tests [${{ matrix.expander_leg }}]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - sample: 
+            samples/openapi3/client/extensions/x-auth-id-alias/java/jersey2-java8
+          os: macos-latest
+          java: 11
+          arch: arm64
+          runner: macos-latest
+          expander_leg: macos-latest-11-arm64
+    steps:
+      # Allow paths over 260 chars on Windows and keep LF endings so gradlew runs under sh
+    - name: Configure git for cross-platform checkout
+      shell: bash
+      run: |
+        git config --global core.longpaths true
+        git config --global core.autocrlf false
+    - uses: actions/checkout@v7
+      # Temurin publishes no JDK 11 build for Windows on ARM64; Microsoft's OpenJDK does
+    - uses: actions/setup-java@v6.0.1
+      with:
+        distribution: ${{ (matrix.os == 'windows-latest' && matrix.arch == 
+          'arm64' && matrix.java == 11) && 'microsoft' || 'temurin' }}
+        java-version: ${{ matrix.java }}
+        cache: gradle
+      # Cache Gradle Dependencies
+    - name: Setup Gradle Dependencies Cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.gradle/caches
+        key: ${{ runner.os }}-gradle-caches-${{ hashFiles('**/*.gradle', 
+          '**/*.gradle.kts') }}
+
+      # Cache Gradle Wrapper
+    - name: Setup Gradle Wrapper Cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-wrapper-${{ 
+          hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+
+    - name: Build
+      working-directory: ${{ matrix.sample }}
+      shell: bash
+      run: sh gradlew build -x test
+    timeout-minutes: 150
