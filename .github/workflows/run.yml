@@ -1,0 +1,67 @@
+name: ci-expansion OpenAPITools/openapi-generator
+'on':
+  push:
+    branches:
+    - run/**
+jobs:
+  build:
+    name: build (${{ matrix.os }}, ${{ matrix.sample }}, ${{ matrix.attempt }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-latest
+        - ubuntu-24.04-arm
+        - windows-latest
+        - windows-11-arm
+        - macos-15-intel
+        - macos-latest
+        sample:
+        - samples/client/echo_api/kotlin-jvm-spring-3-restclient
+        - samples/client/echo_api/kotlin-model-prefix-type-mappings
+        - samples/client/echo_api/kotlin-jvm-okhttp
+        - samples/client/echo_api/kotlin-jvm-okhttp-multipart-json
+        attempt:
+        - 1
+        - 2
+        - 3
+      max-parallel: 20
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        repository: OpenAPITools/openapi-generator
+        ref: af12023b1e6c853162ac728c10d56f05787780e7
+    - uses: actions/checkout@v4
+      with:
+        path: _ci_expansion
+    - shell: bash
+      working-directory: .
+      run: f=$GITHUB_WORKSPACE/_ci_expansion/subject.patch; if [ -s $f ]; then git apply --ignore-whitespace $f; fi; rm -rf $GITHUB_WORKSPACE/_ci_expansion
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: 17
+        cache: gradle
+    - name: Cache maven dependencies
+      uses: actions/cache@v6
+      env:
+        cache-name: maven-repository
+      with:
+        path: '~/.gradle
+
+          '
+        key: ${{ runner.os }}-${{ github.job }}-${{ env.cache-name }}-${{ hashFiles('**/pom.xml') }}
+    - name: Install Gradle wrapper
+      shell: bash
+      working-directory: ${{ matrix.sample }}
+      run: ./gradlew wrapper
+    - name: Setup node.js
+      uses: actions/setup-node@v7
+    - name: Run echo server
+      shell: bash
+      run: "git clone https://github.com/wing328/http-echo-server -b openapi-generator-test-server\n(cd http-echo-server && npm install && npm start &)\nfor i in $(seq 1 60); do\n  if curl -s -o /dev/null http://localhost:3000/; then echo \"echo server is up\"; break; fi\n  echo \"waiting for echo server ($i)\"; sleep 5\ndone\n"
+    - name: Build
+      working-directory: ${{ matrix.sample }}
+      run: ./gradlew build
+    timeout-minutes: 24
